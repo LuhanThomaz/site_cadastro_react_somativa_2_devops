@@ -1,0 +1,33 @@
+os: linux
+dist: focal
+language: node_js
+node_js:
+      - 18
+cache: npm
+jobs:
+  include:
+    - stage: build
+      install:
+        - npm install
+      script:   
+        - npm --version
+
+    - stage: test
+      script:
+        - npm start &
+
+         # Vai Executar o OWASP ZAP no host, ocasionando parada em caso de algum erro ou falha
+        - docker run --add-host=host.docker.internal:host-gateway -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-full-scan.py -t http://host.docker.internal:3000 2> /dev/null; (($? == 2)) && echo 'Done' >&2 
+        - echo "Teste Zap Full Scan concluido"
+
+    - stage: deploy
+      install:
+        - npm install netlify-cli -g
+        - npm install --save react react-dom react-scripts
+      script:
+        - yarn build 
+        - netlify deploy --dir=build --prod
+      after_script:
+        # Caso a pipeline seja concluida por completo com sucesso exibirá uma mensagem de sucesso
+        - bash ./notificacao_telegram.sh
+        - echo "Successo na execução da pipeline"
